@@ -2,18 +2,15 @@ use std::io;
 use std::{
     thread,
     sync::mpsc,
-    error::Error,
-    io::{stdout, Write},
+    io::{Write},
     time::{Duration, Instant},
 };
 use tui::Terminal;
 use tui::backend::CrosstermBackend;
-use tui::widgets::{Widget, Block, Borders};
-use tui::layout::{Layout, Constraint, Direction};
 use crossterm::{
-    event::{self, poll, DisableMouseCapture, EnableMouseCapture, Event as CEvent, KeyCode},
+    event::{self, DisableMouseCapture,  Event as CEvent, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
 };
 mod ui;
 mod app;

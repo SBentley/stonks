@@ -56,7 +56,7 @@ where
             .as_ref(),
         )
         .split(area);
-    //draw_gauges(f, app, chunks[0]);    
+    //draw_gauges(f, app, chunks[0]);
     draw_charts(f, app, chunks[0]);
     draw_text(f, chunks[1]);
 }
@@ -81,12 +81,16 @@ where
             format!("{}", (app.signals.window[0] + app.signals.window[1]) / 2.0),
             format!("{}", app.signals.window[1]),
         ];
+        let mut data =  Vec::<(f64, f64)>::new();
+        data.push((1.0, 217.68));
+        data.push((2.0, 222.49));
+        data.push((3.0, 217.19));
         let datasets = [
             Dataset::default()
                 .name("data2")
                 .marker(symbols::Marker::Dot)
                 .style(Style::default().fg(Color::Cyan))
-                .data(&app.signals.sin1.points),
+                .data(&data),
             Dataset::default()
                 .name("data3")
                 .marker(symbols::Marker::Braille)
@@ -113,8 +117,8 @@ where
                     .title("Y Axis")
                     .style(Style::default().fg(Color::Gray))
                     .labels_style(Style::default().modifier(Modifier::ITALIC))
-                    .bounds([-20.0, 20.0])
-                    .labels(&["-20", "0", "20"]),
+                    .bounds([200.0, 250.0])
+                    .labels(&["0.0", "125", "250"]),
             )
             .datasets(&datasets);
         f.render_widget(chart, chunks[1]);
