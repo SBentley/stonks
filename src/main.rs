@@ -15,6 +15,7 @@ use crossterm::{
 mod ui;
 mod app;
 mod util;
+mod asset;
 
 enum Event<I> {
     Input(I),

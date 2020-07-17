@@ -12,7 +12,7 @@ use tui::{
 };
 
 use crate::app::{InputMode, App};
-use unicode_width::UnicodeWidthStr;
+use crate::asset;
 //use crate::demo::App;
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
@@ -34,8 +34,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .style(Style::default().fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL).title("Search"))
         .style(Style::default().fg(Color::Red));
-    f.render_widget(input, chunks[1]);
-    
+    f.render_widget(input, chunks[1]);    
     
     match app.tabs.index {
         0 => draw_first_tab(f, app, chunks[2]),
@@ -49,7 +48,7 @@ where
 {
     let chunks = Layout::default()
         .constraints(
-            [                
+            [
                 Constraint::Percentage(60),
                 Constraint::Length(7),
             ]
@@ -85,6 +84,9 @@ where
         data.push((1.0, 217.68));
         data.push((2.0, 222.49));
         data.push((3.0, 217.19));
+
+        //asset::Equity::new(name, ticker, current_price);
+        asset::get_equity().unwrap();
         let datasets = [
             Dataset::default()
                 .name("data2")
