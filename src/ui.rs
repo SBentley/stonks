@@ -1,16 +1,17 @@
 use tui::{
     Frame,
     symbols,
-    backend::{Backend, CrosstermBackend},
+    backend::{Backend},
     style::{Color, Modifier, Style},
     layout::{Constraint, Direction, Layout, Rect},
-    widgets::canvas::{Canvas, Line, Map, MapResolution, Rectangle},
     widgets::{
-        Tabs, Text,
-        Axis, Block, Borders, Chart, Dataset, Paragraph, Row, Sparkline,
+        Text,
+        Axis, Block, Borders, Chart, Dataset, Paragraph,
     },
 };
-
+#[allow(unused_imports)]
+use log::{debug, error, info, trace, warn};
+use num_format::{Locale, ToFormattedString};
 use crate::app::{InputMode, App};
 use crate::asset;
 //use crate::demo::App;
@@ -57,7 +58,7 @@ where
         .split(area);
     //draw_gauges(f, app, chunks[0]);
     draw_charts(f, app, chunks[0]);
-    draw_text(f, chunks[1]);
+    draw_text(f, chunks[1], &app);
 }
 
 fn draw_charts<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
@@ -85,8 +86,17 @@ where
         data.push((2.0, 222.49));
         data.push((3.0, 217.19));
 
-        //asset::Equity::new(name, ticker, current_price);
-        asset::get_equity().unwrap();
+        match &app.company {
+            None => { 
+                let api_key = app.config.get("api_key").expect("No API Key in config");
+                match asset::get_equity(api_key, "TSLA") {
+                    Err(err) => println!("Error getting {}",err),
+                    Ok(company) => app.company = Some(company),
+                }
+            },
+            Some(_) => {}
+        }        
+        
         let datasets = [
             Dataset::default()
                 .name("data2")
@@ -127,27 +137,18 @@ where
     }
 }
 
-fn draw_text<B>(f: &mut Frame<B>, area: Rect)
+fn draw_text<B>(f: &mut Frame<B>, area: Rect, app: &App)
 where
     B: Backend,
 {
-    let text = [
-        Text::raw("This is a paragraph with several lines. You can change style your text the way you want.\n\nFor example: "),
-        Text::styled("under", Style::default().fg(Color::Red)),
-        Text::raw(" "),
-        Text::styled("the", Style::default().fg(Color::Green)),
-        Text::raw(" "),
-        Text::styled("rainbow", Style::default().fg(Color::Blue)),
-        Text::raw(".\nOh and if you didn't "),
-        Text::styled("notice", Style::default().modifier(Modifier::ITALIC)),
-        Text::raw(" you can "),
-        Text::styled("automatically", Style::default().modifier(Modifier::BOLD)),
-        Text::raw(" "),
-        Text::styled("wrap", Style::default().modifier(Modifier::REVERSED)),
-        Text::raw(" your "),
-        Text::styled("text", Style::default().modifier(Modifier::UNDERLINED)),
-        Text::raw(".\nOne more thing is that it should display unicode characters: 10€")
-    ];
+    let mut text = vec![];
+    
+    match &app.company
+    {
+        Some(company) => assemble_company_info(company, &mut text),
+        None => {}
+    }
+
     let block = Block::default()
         .borders(Borders::ALL)
         .title("Footer")
@@ -156,5 +157,25 @@ where
         .block(block);
         //.wrap(Wrap { trim: true });
     f.render_widget(paragraph, area);
+}
+
+fn assemble_company_info<'a,'b>(company: &'a asset::Company, text: &'b mut Vec<Text<'a>> ){
+    
+    text.push(Text::styled("Name: ", Style::default().fg(Color::Blue)));
+    text.push(Text::raw(format!("{}",company.name)));
+    text.push(Text::styled("\nTicker: ", Style::default().fg(Color::Blue)));
+    text.push(Text::raw(format!("{}",company.ticker)));
+    text.push(Text::styled("\nCountry: ", Style::default().fg(Color::Blue)));
+    text.push(Text::raw(format!("{}",company.country)));
+    text.push(Text::styled("\nExchange: ", Style::default().fg(Color::Blue)));
+    text.push(Text::raw(format!("{}",company.exchange)));
+    text.push(Text::styled("\nMarket Cap: ", Style::default().fg(Color::Blue)));
+    let market_cap = company.market_capitalization as u64;    
+    text.push(Text::raw(format!("${}", market_cap.to_formatted_string(&Locale::en))));
+    text.push(Text::styled("\nCurrency: ", Style::default().fg(Color::Blue)));
+    text.push(Text::raw(format!("{}",company.currency)));
+    text.push(Text::styled("\nIndustry: ", Style::default().fg(Color::Blue)));
+    text.push(Text::raw(format!("{}",company.industry)));
+
 }
 

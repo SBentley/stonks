@@ -1,11 +1,6 @@
-use crate::util::{StatefulList, TabsState};
-use serde::{Serialize, Deserialize};
-
-const TASKS: [&str; 24] = [
-    "Item1", "Item2", "Item3", "Item4", "Item5", "Item6", "Item7", "Item8", "Item9", "Item10",
-    "Item11", "Item12", "Item13", "Item14", "Item15", "Item16", "Item17", "Item18", "Item19",
-    "Item20", "Item21", "Item22", "Item23", "Item24",
-];
+use std::collections::HashMap;
+use crate::util::{TabsState};
+use crate::asset::Company;
 
 #[derive(Clone)]
 pub struct SinSignal {
@@ -79,14 +74,15 @@ pub struct App<'a> {
     pub show_chart: bool,
     pub should_quit: bool,
     pub tabs: TabsState<'a>,
-    pub tasks: StatefulList<&'a str>,
     pub signals: Signals,
     pub input_mode: InputMode,
     pub input: String,
+    pub company: Option<Company>,
+    pub config: HashMap<String, String>
 }
 
 impl<'a> App<'a> {
-    pub fn new(title: &'a str) -> App<'a> {        
+    pub fn new(title: &'a str, config: HashMap<String, String>) -> App<'a> {        
         let mut sin_signal = SinSignal::new(0.2, 3.0, 18.0);
         let sin1_points = sin_signal.by_ref().take(100).collect();
         let mut sin_signal2 = SinSignal::new(0.1, 2.0, 10.0);
@@ -111,16 +107,17 @@ impl<'a> App<'a> {
                 },
                 window: [0.0, 20.0],
             },
-            tasks: StatefulList::with_items(TASKS.to_vec()),
+            company: None,
+            config,
         }
     }
 
     pub fn on_up(&mut self) {
-        self.tasks.previous();
+        //self.tasks.previous();
     }
 
     pub fn on_down(&mut self) {
-        self.tasks.next();
+        //self.tasks.next();
     }
 
     pub fn on_right(&mut self) {
