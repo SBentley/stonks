@@ -23,7 +23,7 @@ pub struct Company {
 #[derive(Deserialize, Debug, Default)]
 pub struct Prices {
     #[serde(rename(deserialize = "c"))]
-    pub close: Vec<f32>,
+    pub close: Vec<f64>,
 }
 
 pub fn get_error_company() -> Company {
@@ -58,11 +58,7 @@ pub async fn get_equity(
 
     if resp.status().is_success() {
         let mut company: Company = resp.json().await?;
-        company.market_capitalization *= 1000000.0;
-        match  get_price_history(api_key, symbol, "1", client) { 
-            Ok(res) => company.prices = res,
-            _ => {}
-        }
+        company.market_capitalization *= 1000000.0;        
         info!("{:#?}", company);
         Ok(company)
     } else {
@@ -75,8 +71,7 @@ pub async fn get_equity(
 pub async fn get_price_history(
     api_key: &str,
     symbol: &str,
-    resolution: &str,
-    client: Client
+    resolution: &str
 ) -> Result<Prices, Box<dyn std::error::Error>> {
     
     let now = SystemTime::now();    
@@ -87,19 +82,18 @@ pub async fn get_price_history(
 
     info!("Unix timestamp: {}", now);
     info!("Unix - 1 year: {}", one_year_ago);
-    let url = format!("https://finnhub.io/api/v1/stock/candle?symbol={}&resolution={}&from={}&to={}", symbol, resolution, now, one_year_ago);
-    //let client = reqwest::Client::new();
+    let url = format!("https://finnhub.io/api/v1/stock/candle?symbol={}&resolution={}&from={}&to={}", symbol, resolution, one_year_ago, now);
+    let client = reqwest::Client::new();
     let resp = client
         .get(&url)
         .header("X-Finnhub-Token", api_key)
         .send()
         .await?;
-    info!("{}", resp.status());
+    info!("Prices status {}", resp.status());
 
-    //request.header("X-Finnhub-Token", api_key);
-    if resp.status().is_success() {
+    if resp.status().is_success() {        
         let prices: Prices = resp.json().await?;
-        info!("{:#?}", prices);
+        info!("Prices: {:#?}", prices.close.len());
         Ok(prices)
     } else {
         // TODO: fix error handling here, do not return ok if not ok

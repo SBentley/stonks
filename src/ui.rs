@@ -76,31 +76,52 @@ where
         .split(area);
 
     if app.show_chart {
-        let x_labels = [
-            format!("{}", app.signals.window[0]),
-            format!("{}", (app.signals.window[0] + app.signals.window[1]) / 2.0),
-            format!("{}", app.signals.window[1]),
-        ];
-        let mut data =  Vec::<(f64, f64)>::new();
-        data.push((1.0, 217.68));
-        data.push((2.0, 222.49));
-        data.push((3.0, 217.19));
-
+        
+        let symbol = "AAPL";
+        
         match &app.company {
             None => { 
                 let api_key = app.config.get("api_key").expect("No API Key in config");
-                match asset::get_equity(api_key, "TSLA") {
+                match asset::get_equity(api_key, symbol) {
                     Err(err) => println!("Error getting {}",err),
-                    Ok(company) => app.company = Some(company),
+                    Ok(mut company) => { 
+                        match  asset::get_price_history(api_key, symbol, "60") { 
+                            Ok(res) => company.prices = res,
+                            _ => {}
+                        }
+                        app.company = Some(company);
+                    },
                 }
             },
             Some(_) => {}
         }        
+        let mut data =  Vec::<(f64, f64)>::new();
+        data.push((1.0, 217.68));        
+        data.push((2.0, 222.49));
+        data.push((3.0, 217.19));
         
+        if let Some(company) = &app.company {
+            data = label_data(&company.prices.close);
+        }
+        
+        let x_labels = [
+            format!("{}", app.signals.window[0]),
+            format!("{}", data.len() / 10 * 1),
+            format!("{}", data.len() / 10 * 2),
+            format!("{}", data.len() / 10 * 3),
+            format!("{}", data.len() / 10 * 4),
+            format!("{}", data.len() / 10 * 5),
+            format!("{}", data.len() / 10 * 6),
+            format!("{}", data.len() / 10 * 7),
+            format!("{}", data.len() / 10 * 8),
+            format!("{}", data.len() / 10 * 9),            
+            format!("{}", data.len()),
+        ];
+
         let datasets = [
             Dataset::default()
                 .name("data2")
-                .marker(symbols::Marker::Dot)
+                .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Cyan))
                 .data(&data),
             Dataset::default()
@@ -121,7 +142,7 @@ where
                     .title("X Axis")
                     .style(Style::default().fg(Color::Gray))
                     .labels_style(Style::default().modifier(Modifier::ITALIC))
-                    .bounds(app.signals.window)
+                    .bounds([0.0,data.len() as f64])
                     .labels(&x_labels),
             )
             .y_axis(
@@ -129,8 +150,8 @@ where
                     .title("Y Axis")
                     .style(Style::default().fg(Color::Gray))
                     .labels_style(Style::default().modifier(Modifier::ITALIC))
-                    .bounds([200.0, 250.0])
-                    .labels(&["0.0", "125", "250"]),
+                    .bounds([200.0, 400.0])
+                    .labels(&["0.0", "125", "1500"]),
             )
             .datasets(&datasets);
         f.render_widget(chart, chunks[1]);
@@ -179,3 +200,11 @@ fn assemble_company_info<'a,'b>(company: &'a asset::Company, text: &'b mut Vec<T
 
 }
 
+fn label_data(prices: &Vec<f64>) -> Vec<(f64,f64)>{
+    let mut data: Vec<(f64,f64)> = Vec::new();
+
+    for (i,price) in prices.iter().enumerate() {
+        data.push((i as f64,*price));
+    }
+    data
+}
