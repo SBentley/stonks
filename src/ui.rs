@@ -77,7 +77,7 @@ where
 
     if app.show_chart {
         
-        let symbol = "AAPL";
+        let symbol = "MSFT";
         
         match &app.company {
             None => { 
@@ -85,7 +85,7 @@ where
                 match asset::get_equity(api_key, symbol) {
                     Err(err) => println!("Error getting {}",err),
                     Ok(mut company) => { 
-                        match  asset::get_price_history(api_key, symbol, "60") { 
+                        match  asset::get_price_history(api_key, symbol, "D") { 
                             Ok(res) => company.prices = res,
                             _ => {}
                         }
@@ -100,10 +100,14 @@ where
         data.push((2.0, 222.49));
         data.push((3.0, 217.19));
         
+        let mut min = 0.0;
+        let mut max = 300.0;
         if let Some(company) = &app.company {
             data = label_data(&company.prices.close);
+            let price_range = get_range(&company.prices.close);
+            min = price_range.0;
+            max = price_range.1;
         }
-        
         let x_labels = [
             format!("{}", app.signals.window[0]),
             format!("{}", data.len() / 10 * 1),
@@ -117,6 +121,7 @@ where
             format!("{}", data.len() / 10 * 9),            
             format!("{}", data.len()),
         ];
+
 
         let datasets = [
             Dataset::default()
@@ -150,10 +155,10 @@ where
                     .title("Y Axis")
                     .style(Style::default().fg(Color::Gray))
                     .labels_style(Style::default().modifier(Modifier::ITALIC))
-                    .bounds([200.0, 400.0])
-                    .labels(&["0.0", "125", "1500"]),
+                    .bounds([min, max])
+                    .labels(&["min", "mid", "max"]),
             )
-            .datasets(&datasets);
+            .datasets(&datasets);            
         f.render_widget(chart, chunks[1]);
     }
 }
@@ -207,4 +212,20 @@ fn label_data(prices: &Vec<f64>) -> Vec<(f64,f64)>{
         data.push((i as f64,*price));
     }
     data
+}
+
+fn get_range(prices: &Vec<f64>) -> (f64, f64){
+    let mut min = std::u32::MAX as f64;
+    let mut max = 0.0;
+
+    for price in prices {
+        if *price > max { 
+            max = *price;
+        };
+        if *price < min {
+            min = *price;
+        }
+    }
+
+    (min, max)
 }
