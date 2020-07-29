@@ -1,4 +1,3 @@
-
 pub struct TabsState<'a> {
     pub titles: Vec<&'a str>,
     pub index: usize,

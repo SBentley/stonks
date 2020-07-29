@@ -1,26 +1,29 @@
-use tui::{
-    Frame,
-    symbols,
-    backend::{Backend},
-    style::{Color, Modifier, Style},
-    layout::{Constraint, Direction, Layout, Rect},
-    widgets::{
-        Text,
-        Axis, Block, Borders, Chart, Dataset, Paragraph,
-    },
-};
+use crate::app::{App, InputMode};
+use crate::asset;
 #[allow(unused_imports)]
 use log::{debug, error, info, trace, warn};
 use num_format::{Locale, ToFormattedString};
-use crate::app::{InputMode, App};
-use crate::asset;
+use tui::{
+    backend::Backend,
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    symbols,
+    widgets::{Axis, Block, Borders, Chart, Dataset, Paragraph, Text},
+    Frame,
+};
 //use crate::demo::App;
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
-        .constraints([Constraint::Percentage(3), Constraint::Percentage(7), Constraint::Percentage(90)].as_ref())
+        .constraints(
+            [
+                Constraint::Percentage(3),
+                Constraint::Percentage(7),
+                Constraint::Percentage(90),
+            ]
+            .as_ref(),
+        )
         .split(f.size());
-
 
     let msg = match app.input_mode {
         InputMode::Normal => "Search for an asset",
@@ -35,8 +38,8 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .style(Style::default().fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL).title("Search"))
         .style(Style::default().fg(Color::Red));
-    f.render_widget(input, chunks[1]);    
-    
+    f.render_widget(input, chunks[1]);
+
     match app.tabs.index {
         0 => draw_first_tab(f, app, chunks[2]),
         _ => {}
@@ -48,13 +51,7 @@ where
     B: Backend,
 {
     let chunks = Layout::default()
-        .constraints(
-            [
-                Constraint::Percentage(60),
-                Constraint::Length(7),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Percentage(60), Constraint::Length(7)].as_ref())
         .split(area);
     //draw_gauges(f, app, chunks[0]);
     draw_charts(f, app, chunks[0]);
@@ -76,30 +73,27 @@ where
         .split(area);
 
     if app.show_chart {
-        
-        let symbol = "MSFT";
-        
         match &app.company {
-            None => { 
+            None => {
                 let api_key = app.config.get("api_key").expect("No API Key in config");
-                match asset::get_equity(api_key, symbol) {
-                    Err(err) => println!("Error getting {}",err),
-                    Ok(mut company) => { 
-                        match  asset::get_price_history(api_key, symbol, "D") { 
+                match asset::get_equity(api_key, &app.symbol) {
+                    Err(err) => println!("Error getting {}", err),
+                    Ok(mut company) => {
+                        match asset::get_price_history(api_key, &app.symbol, "D") {
                             Ok(res) => company.prices = res,
                             _ => {}
                         }
                         app.company = Some(company);
-                    },
+                    }
                 }
-            },
+            }
             Some(_) => {}
-        }        
-        let mut data =  Vec::<(f64, f64)>::new();
-        data.push((1.0, 217.68));        
+        }
+        let mut data = Vec::<(f64, f64)>::new();
+        data.push((1.0, 217.68));
         data.push((2.0, 222.49));
         data.push((3.0, 217.19));
-        
+
         let mut min = 0.0;
         let mut max = 300.0;
         if let Some(company) = &app.company {
@@ -118,10 +112,9 @@ where
             format!("{}", data.len() / 10 * 6),
             format!("{}", data.len() / 10 * 7),
             format!("{}", data.len() / 10 * 8),
-            format!("{}", data.len() / 10 * 9),            
+            format!("{}", data.len() / 10 * 9),
             format!("{}", data.len()),
         ];
-
 
         let datasets = [
             Dataset::default()
@@ -131,7 +124,7 @@ where
                 .data(&data),
             Dataset::default()
                 .name("data3")
-                .marker(symbols::Marker::Braille)
+                .marker(symbols::Marker::Dot)
                 .style(Style::default().fg(Color::LightGreen))
                 .data(&app.signals.sin2.points),
         ];
@@ -147,7 +140,7 @@ where
                     .title("X Axis")
                     .style(Style::default().fg(Color::Gray))
                     .labels_style(Style::default().modifier(Modifier::ITALIC))
-                    .bounds([0.0,data.len() as f64])
+                    .bounds([0.0, data.len() as f64])
                     .labels(&x_labels),
             )
             .y_axis(
@@ -158,7 +151,7 @@ where
                     .bounds([min, max])
                     .labels(&["min", "mid", "max"]),
             )
-            .datasets(&datasets);            
+            .datasets(&datasets);
         f.render_widget(chart, chunks[1]);
     }
 }
@@ -168,9 +161,8 @@ where
     B: Backend,
 {
     let mut text = vec![];
-    
-    match &app.company
-    {
+
+    match &app.company {
         Some(company) => assemble_company_info(company, &mut text),
         None => {}
     }
@@ -179,47 +171,67 @@ where
         .borders(Borders::ALL)
         .title("Footer")
         .title_style(Style::default().fg(Color::Magenta).modifier(Modifier::BOLD));
-    let paragraph = Paragraph::new(text.iter())
-        .block(block);
-        //.wrap(Wrap { trim: true });
+    let paragraph = Paragraph::new(text.iter()).block(block);
+    //.wrap(Wrap { trim: true });
     f.render_widget(paragraph, area);
 }
 
-fn assemble_company_info<'a,'b>(company: &'a asset::Company, text: &'b mut Vec<Text<'a>> ){
-    
+fn assemble_company_info<'a, 'b>(company: &'a asset::Company, text: &'b mut Vec<Text<'a>>) {
     text.push(Text::styled("Name: ", Style::default().fg(Color::Blue)));
-    text.push(Text::raw(format!("{}",company.name)));
+    text.push(Text::raw(format!("{}", company.name)));
+    text.push(Text::styled("\nPrice: ", Style::default().fg(Color::Blue)));
+    text.push(Text::raw(format!(
+        "{}",
+        company.prices.close[company.prices.close.len() - 1]
+    )));
     text.push(Text::styled("\nTicker: ", Style::default().fg(Color::Blue)));
-    text.push(Text::raw(format!("{}",company.ticker)));
-    text.push(Text::styled("\nCountry: ", Style::default().fg(Color::Blue)));
-    text.push(Text::raw(format!("{}",company.country)));
-    text.push(Text::styled("\nExchange: ", Style::default().fg(Color::Blue)));
-    text.push(Text::raw(format!("{}",company.exchange)));
-    text.push(Text::styled("\nMarket Cap: ", Style::default().fg(Color::Blue)));
-    let market_cap = company.market_capitalization as u64;    
-    text.push(Text::raw(format!("${}", market_cap.to_formatted_string(&Locale::en))));
-    text.push(Text::styled("\nCurrency: ", Style::default().fg(Color::Blue)));
-    text.push(Text::raw(format!("{}",company.currency)));
-    text.push(Text::styled("\nIndustry: ", Style::default().fg(Color::Blue)));
-    text.push(Text::raw(format!("{}",company.industry)));
-
+    text.push(Text::raw(format!("{}", company.ticker)));
+    text.push(Text::styled(
+        "\nCountry: ",
+        Style::default().fg(Color::Blue),
+    ));
+    text.push(Text::raw(format!("{}", company.country)));
+    text.push(Text::styled(
+        "\nExchange: ",
+        Style::default().fg(Color::Blue),
+    ));
+    text.push(Text::raw(format!("{}", company.exchange)));
+    text.push(Text::styled(
+        "\nMarket Cap: ",
+        Style::default().fg(Color::Blue),
+    ));
+    let market_cap = company.market_capitalization as u64;
+    text.push(Text::raw(format!(
+        "${}",
+        market_cap.to_formatted_string(&Locale::en)
+    )));
+    text.push(Text::styled(
+        "\nCurrency: ",
+        Style::default().fg(Color::Blue),
+    ));
+    text.push(Text::raw(format!("{}", company.currency)));
+    text.push(Text::styled(
+        "\nIndustry: ",
+        Style::default().fg(Color::Blue),
+    ));
+    text.push(Text::raw(format!("{}", company.industry)));
 }
 
-fn label_data(prices: &Vec<f64>) -> Vec<(f64,f64)>{
-    let mut data: Vec<(f64,f64)> = Vec::new();
+fn label_data(prices: &Vec<f64>) -> Vec<(f64, f64)> {
+    let mut data: Vec<(f64, f64)> = Vec::new();
 
-    for (i,price) in prices.iter().enumerate() {
-        data.push((i as f64,*price));
+    for (i, price) in prices.iter().enumerate() {
+        data.push((i as f64, *price));
     }
     data
 }
 
-fn get_range(prices: &Vec<f64>) -> (f64, f64){
+fn get_range(prices: &Vec<f64>) -> (f64, f64) {
     let mut min = std::u32::MAX as f64;
     let mut max = 0.0;
 
     for price in prices {
-        if *price > max { 
+        if *price > max {
             max = *price;
         };
         if *price < min {

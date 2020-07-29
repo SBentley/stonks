@@ -2,8 +2,12 @@ use chrono::{offset::Utc, DateTime, Duration};
 #[allow(unused_imports)]
 use log::{debug, error, info, trace, warn};
 use serde::Deserialize;
-use std::time::{SystemTime};
+use std::{net::TcpStream, time::{SystemTime}};
+use url::Url;
+use tungstenite::{WebSocket, Message, stream::Stream};
+//use serde_json::{Result};
 use reqwest::Client;
+use native_tls::TlsStream;
 
 #[derive(Deserialize, Debug)]
 pub struct Company {
@@ -18,6 +22,24 @@ pub struct Company {
     pub industry: String,
     #[serde(skip)]
     pub prices: Prices,
+}
+#[derive(Deserialize, Debug)]
+pub struct LiveData {
+    #[serde(rename(deserialize = "p"))]
+    pub price: f32,
+    #[serde(rename(deserialize = "s"))]
+    pub symbol: String,
+    #[serde(rename(deserialize = "t"))]
+    pub time: u64,
+    #[serde(rename(deserialize = "v"))]
+    pub volume: f32,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Feed {    
+    pub data: Option<Vec<LiveData>>,
+    #[serde(rename(deserialize = "type"))]
+    pub message_type: String,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -98,5 +120,29 @@ pub async fn get_price_history(
     } else {
         // TODO: fix error handling here, do not return ok if not ok
         Ok(Prices { close: vec![0.0] })
+    }
+}
+
+pub fn live_price(api_key: &str,symbol: &str, socket: WebSocket<Stream<TcpStream, TlsStream<TcpStream>>>) {
+    // A WebSocket echo server   
+    
+    let symbol = "TSLA";
+
+    let subscribe_msg = tungstenite::Message::Text(String::from("{\"type\":\"subscribe\",\"symbol\":\"TSLA\"}"));
+    socket.write_message(subscribe_msg).unwrap();
+    for (ref header, _value) in response.headers() {
+        println!("* {}", header);
+    }
+    
+    loop {
+        let msg = socket.read_message().expect("Error reading message");
+//        println!("{}",msg);
+        if let Message::Text(text) = msg {            
+            let msg: Feed = serde_json::from_str(&text).unwrap();
+            if let Some(data) = msg.data {
+                let price = data[0].price;
+                
+            }
+        }        
     }
 }

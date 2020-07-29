@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use crate::util::{TabsState};
 use crate::asset::Company;
+use crate::util::TabsState;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct SinSignal {
@@ -29,7 +29,6 @@ impl Iterator for SinSignal {
         Some(point)
     }
 }
-
 
 pub struct Signal<S: Iterator> {
     source: S,
@@ -78,11 +77,12 @@ pub struct App<'a> {
     pub input_mode: InputMode,
     pub input: String,
     pub company: Option<Company>,
-    pub config: HashMap<String, String>
+    pub symbol: String,
+    pub config: HashMap<String, String>,
 }
 
 impl<'a> App<'a> {
-    pub fn new(title: &'a str, config: HashMap<String, String>) -> App<'a> {        
+    pub fn new(title: &'a str, symbol: String, config: HashMap<String, String>) -> App<'a> {
         let mut sin_signal = SinSignal::new(0.2, 3.0, 18.0);
         let sin1_points = sin_signal.by_ref().take(100).collect();
         let mut sin_signal2 = SinSignal::new(0.1, 2.0, 10.0);
@@ -108,6 +108,7 @@ impl<'a> App<'a> {
                 window: [0.0, 20.0],
             },
             company: None,
+            symbol,
             config,
         }
     }
@@ -139,6 +140,5 @@ impl<'a> App<'a> {
 
     pub fn on_tick(&mut self) {
         // Update progress
-
     }
 }
