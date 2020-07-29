@@ -2,11 +2,11 @@ use chrono::{offset::Utc, DateTime, Duration};
 #[allow(unused_imports)]
 use log::{debug, error, info, trace, warn};
 use serde::Deserialize;
-use std::{net::TcpStream, time::{SystemTime}};
-use url::Url;
-use tungstenite::{WebSocket, Message, stream::Stream};
+use std::{net::TcpStream, sync::mpsc, time::SystemTime};
+use tungstenite::{http, stream::Stream, Message, WebSocket};
 //use serde_json::{Result};
-use reqwest::Client;
+use http::Response;
+use mpsc::Sender;
 use native_tls::TlsStream;
 
 #[derive(Deserialize, Debug)]
@@ -36,7 +36,7 @@ pub struct LiveData {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Feed {    
+pub struct Feed {
     pub data: Option<Vec<LiveData>>,
     #[serde(rename(deserialize = "type"))]
     pub message_type: String,
@@ -46,6 +46,8 @@ pub struct Feed {
 pub struct Prices {
     #[serde(rename(deserialize = "c"))]
     pub close: Vec<f64>,
+    #[serde(skip)]
+    pub live_price: f64,
 }
 
 pub fn get_error_company() -> Company {
@@ -59,6 +61,7 @@ pub fn get_error_company() -> Company {
         industry: String::from("Technology"),
         prices: Prices {
             close: vec![1.0, 2.0, 3.0],
+            live_price: 1.0,
         },
     }
 }
@@ -67,8 +70,7 @@ pub fn get_error_company() -> Company {
 pub async fn get_equity(
     api_key: &str,
     symbol: &str,
-) -> Result<Company, Box<dyn std::error::Error>> {    
-    
+) -> Result<Company, Box<dyn std::error::Error>> {
     let url = format!("https://finnhub.io/api/v1/stock/profile2?symbol={}", symbol);
     let client = reqwest::Client::new();
     let resp = client
@@ -80,7 +82,7 @@ pub async fn get_equity(
 
     if resp.status().is_success() {
         let mut company: Company = resp.json().await?;
-        company.market_capitalization *= 1000000.0;        
+        company.market_capitalization *= 1000000.0;
         info!("{:#?}", company);
         Ok(company)
     } else {
@@ -93,10 +95,9 @@ pub async fn get_equity(
 pub async fn get_price_history(
     api_key: &str,
     symbol: &str,
-    resolution: &str
+    resolution: &str,
 ) -> Result<Prices, Box<dyn std::error::Error>> {
-    
-    let now = SystemTime::now();    
+    let now = SystemTime::now();
     let now: DateTime<Utc> = now.into();
     let one_year_ago = now - Duration::days(365);
     let now = now.format("%s").to_string();
@@ -104,7 +105,10 @@ pub async fn get_price_history(
 
     info!("Unix timestamp: {}", now);
     info!("Unix - 1 year: {}", one_year_ago);
-    let url = format!("https://finnhub.io/api/v1/stock/candle?symbol={}&resolution={}&from={}&to={}", symbol, resolution, one_year_ago, now);
+    let url = format!(
+        "https://finnhub.io/api/v1/stock/candle?symbol={}&resolution={}&from={}&to={}",
+        symbol, resolution, one_year_ago, now
+    );
     let client = reqwest::Client::new();
     let resp = client
         .get(&url)
@@ -113,36 +117,38 @@ pub async fn get_price_history(
         .await?;
     info!("Prices status {}", resp.status());
 
-    if resp.status().is_success() {        
+    if resp.status().is_success() {
+        info!("price success");
         let prices: Prices = resp.json().await?;
         info!("Prices: {:#?}", prices.close.len());
         Ok(prices)
     } else {
         // TODO: fix error handling here, do not return ok if not ok
-        Ok(Prices { close: vec![0.0] })
+        Ok(Prices {
+            close: vec![0.0],
+            live_price: 1.0,
+        })
     }
 }
 
-pub fn live_price(api_key: &str,symbol: &str, socket: WebSocket<Stream<TcpStream, TlsStream<TcpStream>>>) {
-    // A WebSocket echo server   
-    
-    let symbol = "TSLA";
-
-    let subscribe_msg = tungstenite::Message::Text(String::from("{\"type\":\"subscribe\",\"symbol\":\"TSLA\"}"));
-    socket.write_message(subscribe_msg).unwrap();
-    for (ref header, _value) in response.headers() {
-        println!("* {}", header);
-    }
-    
+// TODO: Create type alias.
+pub fn live_price(
+    symbol: &str,
+    mut socket: WebSocket<Stream<TcpStream, TlsStream<TcpStream>>>,
+    response: Response<()>,
+    tx: Sender<f64>,
+) {
     loop {
         let msg = socket.read_message().expect("Error reading message");
-//        println!("{}",msg);
-        if let Message::Text(text) = msg {            
+        //        println!("{}",msg);
+        if let Message::Text(text) = msg {
             let msg: Feed = serde_json::from_str(&text).unwrap();
             if let Some(data) = msg.data {
-                let price = data[0].price;
-                
+                let price: f64 = data[0].price as f64;
+                info!("ws prices: {}", price);
+                tx.send(price)
+                    .expect("Error sending ws data between threads");
             }
-        }        
+        }
     }
 }

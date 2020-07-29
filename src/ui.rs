@@ -1,8 +1,9 @@
 use crate::app::{App, InputMode};
 use crate::asset;
-#[allow(unused_imports)]
 use log::{debug, error, info, trace, warn};
 use num_format::{Locale, ToFormattedString};
+#[allow(unused_imports)]
+use std::{sync::mpsc::Receiver, time::Duration};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -13,7 +14,7 @@ use tui::{
 };
 //use crate::demo::App;
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<f64>) {
     let chunks = Layout::default()
         .constraints(
             [
@@ -41,12 +42,12 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(input, chunks[1]);
 
     match app.tabs.index {
-        0 => draw_first_tab(f, app, chunks[2]),
+        0 => draw_first_tab(f, app, chunks[2], &wsrx),
         _ => {}
     };
 }
 
-fn draw_first_tab<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
+fn draw_first_tab<B>(f: &mut Frame<B>, app: &mut App, area: Rect, wsrx: &Receiver<f64>)
 where
     B: Backend,
 {
@@ -55,7 +56,7 @@ where
         .split(area);
     //draw_gauges(f, app, chunks[0]);
     draw_charts(f, app, chunks[0]);
-    draw_text(f, chunks[1], &app);
+    draw_text(f, chunks[1], app, &wsrx);
 }
 
 fn draw_charts<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
@@ -156,14 +157,14 @@ where
     }
 }
 
-fn draw_text<B>(f: &mut Frame<B>, area: Rect, app: &App)
+fn draw_text<B>(f: &mut Frame<B>, area: Rect, app: &mut App, wsrx: &Receiver<f64>)
 where
     B: Backend,
 {
     let mut text = vec![];
 
-    match &app.company {
-        Some(company) => assemble_company_info(company, &mut text),
+    match &mut app.company {
+        Some(company) => assemble_company_info(company, &mut text, wsrx),
         None => {}
     }
 
@@ -176,14 +177,20 @@ where
     f.render_widget(paragraph, area);
 }
 
-fn assemble_company_info<'a, 'b>(company: &'a asset::Company, text: &'b mut Vec<Text<'a>>) {
+fn assemble_company_info<'a, 'b>(
+    company: &'a mut asset::Company,
+    text: &'b mut Vec<Text<'a>>,
+    wsrx: &Receiver<f64>,
+) {
     text.push(Text::styled("Name: ", Style::default().fg(Color::Blue)));
     text.push(Text::raw(format!("{}", company.name)));
     text.push(Text::styled("\nPrice: ", Style::default().fg(Color::Blue)));
-    text.push(Text::raw(format!(
-        "{}",
-        company.prices.close[company.prices.close.len() - 1]
-    )));
+    if company.prices.close.len() > 0 {
+        text.push(Text::raw(format!(
+            "{}",
+            company.prices.close[company.prices.close.len() - 1]
+        )));
+    }
     text.push(Text::styled("\nTicker: ", Style::default().fg(Color::Blue)));
     text.push(Text::raw(format!("{}", company.ticker)));
     text.push(Text::styled(
@@ -215,6 +222,37 @@ fn assemble_company_info<'a, 'b>(company: &'a asset::Company, text: &'b mut Vec<
         Style::default().fg(Color::Blue),
     ));
     text.push(Text::raw(format!("{}", company.industry)));
+
+    text.push(Text::styled(
+        "\nLive Price: ",
+        Style::default().fg(Color::Blue),
+    ));
+
+    let mut live_price = company.prices.live_price;
+    let d = Duration::from_millis(1);
+    let res = wsrx.recv_timeout(d);
+    match res {
+        Ok(price) => {
+            if price > company.prices.live_price {
+                text.push(Text::styled(
+                    format!("{}", price),
+                    Style::default().fg(Color::Green),
+                ));
+            } else {
+                text.push(Text::styled(
+                    format!("{}", price),
+                    Style::default().fg(Color::Red),
+                ));
+            }
+            company.prices.live_price = price;
+        }
+        Err(e) => text.push(Text::raw(format!("{}", company.prices.live_price))),
+    }
+    // blocking
+    // for received in wsrx {
+    //     live_price = received;
+    //     company.prices.live_price = live_price;
+    // }
 }
 
 fn label_data(prices: &Vec<f64>) -> Vec<(f64, f64)> {

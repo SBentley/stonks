@@ -67,24 +67,36 @@ fn main() -> Result<(), io::Error> {
 
     // Live prices websocket
     let (wstx, wsrx) = mpsc::channel();
-    let api_key = app.config.get("api_key");
-    if let Some(key) = api_key {
-        thread::spawn(move || {
-            let (mut socket, response) = tungstenite::connect(
-                Url::parse(&format!("wss://ws.finnhub.io?token={}", key)).unwrap(),
-            )
-            .expect("cannot connect");
-            loop {
-                // poll for tick rate duration, if no events, sent tick event.
-                wstx.send(1.0).unwrap();
-            }
-        });
-    }
+    let api_key = app
+        .config
+        .get("api_key")
+        .expect("Could not get api_key")
+        .to_string();
+    let symbol = app.symbol.to_string();
+    thread::spawn(move || {
+        let (mut socket, response) = tungstenite::connect(
+            Url::parse(&format!("wss://ws.finnhub.io?token={}", api_key)).unwrap(),
+        )
+        .expect("cannot connect to websocket");
+
+        // A WebSocket echo server
+        let message_text = format!(
+            "{{\"type\":\"subscribe\",\"symbol\":\"{}\"}}",
+            "BINANCE:BTCUSDT" /*symbol*/
+        );
+        let subscribe_msg = tungstenite::Message::Text(String::from(message_text));
+        socket.write_message(subscribe_msg).unwrap();
+        for (ref header, _value) in response.headers() {
+            info!("ws headers: {}", header);
+        }
+
+        asset::live_price(&symbol, socket, response, wstx);
+    });
 
     terminal.clear()?;
 
     loop {
-        terminal.draw(|mut f| ui::draw(&mut f, &mut app))?;
+        terminal.draw(|mut f| ui::draw(&mut f, &mut app, &wsrx))?;
         terminal.set_cursor(20, 20).unwrap();
         match rx.recv().unwrap() {
             Event::Input(event) => match event.code {
