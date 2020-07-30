@@ -3,9 +3,8 @@ use chrono::{offset::Utc, DateTime, Duration};
 use log::{debug, error, info, trace, warn};
 use serde::Deserialize;
 use std::{net::TcpStream, sync::mpsc, time::SystemTime};
-use tungstenite::{http, stream::Stream, Message, WebSocket};
+use tungstenite::{stream::Stream, Message, WebSocket};
 //use serde_json::{Result};
-use http::Response;
 use mpsc::Sender;
 use native_tls::TlsStream;
 
@@ -48,6 +47,8 @@ pub struct Prices {
     pub close: Vec<f64>,
     #[serde(skip)]
     pub live_price: f64,
+    #[serde(skip)]
+    pub movement_indicator: String,
 }
 
 pub fn get_error_company() -> Company {
@@ -62,6 +63,7 @@ pub fn get_error_company() -> Company {
         prices: Prices {
             close: vec![1.0, 2.0, 3.0],
             live_price: 1.0,
+            movement_indicator: String::new(),
         },
     }
 }
@@ -116,6 +118,7 @@ pub async fn get_price_history(
         .send()
         .await?;
     info!("Prices status {}", resp.status());
+    info!("Price response: {:#?}", resp);
 
     if resp.status().is_success() {
         info!("price success");
@@ -127,16 +130,15 @@ pub async fn get_price_history(
         Ok(Prices {
             close: vec![0.0],
             live_price: 1.0,
+            movement_indicator: String::new(),
         })
     }
 }
 
 // TODO: Create type alias.
 pub fn live_price(
-    symbol: &str,
     mut socket: WebSocket<Stream<TcpStream, TlsStream<TcpStream>>>,
-    response: Response<()>,
-    tx: Sender<f64>,
+    tx: Sender<(String, f64)>,
 ) {
     loop {
         let msg = socket.read_message().expect("Error reading message");
@@ -145,8 +147,9 @@ pub fn live_price(
             let msg: Feed = serde_json::from_str(&text).unwrap();
             if let Some(data) = msg.data {
                 let price: f64 = data[0].price as f64;
-                info!("ws prices: {}", price);
-                tx.send(price)
+                let symbol = data[0].symbol.to_string();
+                //debug!("ws price {}: {}", symbol, price);
+                tx.send((symbol, price))
                     .expect("Error sending ws data between threads");
             }
         }

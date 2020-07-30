@@ -63,7 +63,7 @@ fn main() -> Result<(), io::Error> {
         }
     });
 
-    let mut app = app::App::new("Stonks", String::from("MSFT"), config);
+    let mut app = app::App::new("Stonks", String::from("TSLA"), config);
 
     // Live prices websocket
     let (wstx, wsrx) = mpsc::channel();
@@ -82,7 +82,8 @@ fn main() -> Result<(), io::Error> {
         // A WebSocket echo server
         let message_text = format!(
             "{{\"type\":\"subscribe\",\"symbol\":\"{}\"}}",
-            "BINANCE:BTCUSDT" /*symbol*/
+            //"BINANCE:BTCUSDT" 
+            symbol
         );
         let subscribe_msg = tungstenite::Message::Text(String::from(message_text));
         socket.write_message(subscribe_msg).unwrap();
@@ -90,7 +91,7 @@ fn main() -> Result<(), io::Error> {
             info!("ws headers: {}", header);
         }
 
-        asset::live_price(&symbol, socket, response, wstx);
+        asset::live_price(socket, wstx);
     });
 
     terminal.clear()?;
@@ -149,6 +150,7 @@ fn setup_logger() -> Result<(), fern::InitError> {
 
 fn get_config() -> HashMap<String, String> {
     let mut settings = config::Config::default();
+
     settings.merge(config::File::with_name("config")).unwrap();
     settings.try_into::<HashMap<String, String>>().unwrap()
 }

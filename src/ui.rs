@@ -1,5 +1,6 @@
 use crate::app::{App, InputMode};
 use crate::asset;
+#[allow(unused_imports)]
 use log::{debug, error, info, trace, warn};
 use num_format::{Locale, ToFormattedString};
 #[allow(unused_imports)]
@@ -12,9 +13,8 @@ use tui::{
     widgets::{Axis, Block, Borders, Chart, Dataset, Paragraph, Text},
     Frame,
 };
-//use crate::demo::App;
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<f64>) {
+pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<(String, f64)>) {
     let chunks = Layout::default()
         .constraints(
             [
@@ -47,7 +47,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<f64>) {
     };
 }
 
-fn draw_first_tab<B>(f: &mut Frame<B>, app: &mut App, area: Rect, wsrx: &Receiver<f64>)
+fn draw_first_tab<B>(f: &mut Frame<B>, app: &mut App, area: Rect, wsrx: &Receiver<(String, f64)>)
 where
     B: Backend,
 {
@@ -98,13 +98,14 @@ where
         let mut min = 0.0;
         let mut max = 300.0;
         if let Some(company) = &app.company {
+            //info!("{:#?}",company);
             data = label_data(&company.prices.close);
             let price_range = get_range(&company.prices.close);
             min = price_range.0;
             max = price_range.1;
         }
         let x_labels = [
-            format!("{}", app.signals.window[0]),
+            format!("{}", 0),
             format!("{}", data.len() / 10 * 1),
             format!("{}", data.len() / 10 * 2),
             format!("{}", data.len() / 10 * 3),
@@ -123,11 +124,6 @@ where
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Cyan))
                 .data(&data),
-            Dataset::default()
-                .name("data3")
-                .marker(symbols::Marker::Dot)
-                .style(Style::default().fg(Color::LightGreen))
-                .data(&app.signals.sin2.points),
         ];
         let chart = Chart::default()
             .block(
@@ -157,7 +153,7 @@ where
     }
 }
 
-fn draw_text<B>(f: &mut Frame<B>, area: Rect, app: &mut App, wsrx: &Receiver<f64>)
+fn draw_text<B>(f: &mut Frame<B>, area: Rect, app: &mut App, wsrx: &Receiver<(String, f64)>)
 where
     B: Backend,
 {
@@ -180,7 +176,7 @@ where
 fn assemble_company_info<'a, 'b>(
     company: &'a mut asset::Company,
     text: &'b mut Vec<Text<'a>>,
-    wsrx: &Receiver<f64>,
+    wsrx: &Receiver<(String, f64)>,
 ) {
     text.push(Text::styled("Name: ", Style::default().fg(Color::Blue)));
     text.push(Text::raw(format!("{}", company.name)));
@@ -223,36 +219,52 @@ fn assemble_company_info<'a, 'b>(
     ));
     text.push(Text::raw(format!("{}", company.industry)));
 
-    text.push(Text::styled(
-        "\nLive Price: ",
-        Style::default().fg(Color::Blue),
-    ));
+    live_price_text(text, company, wsrx);
 
-    let mut live_price = company.prices.live_price;
-    let d = Duration::from_millis(1);
-    let res = wsrx.recv_timeout(d);
+}
+
+fn live_price_text(text: &mut Vec<Text>, company: &mut asset::Company, wsrx: &Receiver<(String, f64)>) {
+    let d = Duration::from_millis(0);
+    let res = wsrx.recv();// recv_timeout(d);
     match res {
-        Ok(price) => {
-            if price > company.prices.live_price {
+        Ok(msg) => {
+            let (symbol, price) = msg;
+            text.push(Text::styled(
+                format!("\nLive - {} ", symbol),
+                Style::default().fg(Color::Blue),
+            ));
+            if price > company.prices.live_price {                
                 text.push(Text::styled(
-                    format!("{}", price),
+                    format!("▲ {}", price),
                     Style::default().fg(Color::Green),
                 ));
+                company.prices.movement_indicator = String::from("▲");
             } else {
                 text.push(Text::styled(
-                    format!("{}", price),
+                    format!("▼ {}", price),
                     Style::default().fg(Color::Red),
                 ));
+                company.prices.movement_indicator = String::from("▼");
             }
             company.prices.live_price = price;
         }
-        Err(e) => text.push(Text::raw(format!("{}", company.prices.live_price))),
+        Err(e) => {
+            text.push(Text::styled(
+                format!("\nLive - {} ", company.ticker),
+                Style::default().fg(Color::Blue),
+            ));
+            let mut color = Color::Red;
+            if company.prices.movement_indicator == "▲" {
+                color = Color::Green;
+            }
+
+            text.push(Text::styled(
+                format!("{} {}", company.prices.movement_indicator, company.prices.live_price),
+                Style::default().fg(color),
+            ));
+            //error!("{}", e);
+        }
     }
-    // blocking
-    // for received in wsrx {
-    //     live_price = received;
-    //     company.prices.live_price = live_price;
-    // }
 }
 
 fn label_data(prices: &Vec<f64>) -> Vec<(f64, f64)> {
