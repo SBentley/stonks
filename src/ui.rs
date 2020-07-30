@@ -125,7 +125,12 @@ where
                 .style(Style::default().fg(Color::Cyan))
                 .data(&data),
         ];
-        let chart = Chart::default()
+        let min_string = format!("{}", min as u16);
+        let mid_string = format!("{}", (max as u16 + min as u16) / 2);
+        let max_string = format!("{}", max as u16);        
+        let labels = [min_string,mid_string, max_string];
+
+        let chart = Chart::default()    
             .block(
                 Block::default()
                     .title("Chart")
@@ -146,7 +151,7 @@ where
                     .style(Style::default().fg(Color::Gray))
                     .labels_style(Style::default().modifier(Modifier::ITALIC))
                     .bounds([min, max])
-                    .labels(&["min", "mid", "max"]),
+                    .labels(&labels),
             )
             .datasets(&datasets);
         f.render_widget(chart, chunks[1]);
