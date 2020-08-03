@@ -95,10 +95,9 @@ fn main() -> Result<(), io::Error> {
     });
 
     terminal.clear()?;
-
+    terminal.hide_cursor().unwrap();
     loop {
         terminal.draw(|mut f| ui::draw(&mut f, &mut app, &wsrx))?;
-        terminal.set_cursor(20, 20).unwrap();
         match rx.recv().unwrap() {
             Event::Input(event) => match event.code {
                 KeyCode::Char('q') => {
@@ -117,6 +116,9 @@ fn main() -> Result<(), io::Error> {
                 KeyCode::Up => app.on_up(),
                 KeyCode::Right => app.on_right(),
                 KeyCode::Down => app.on_down(),
+                KeyCode::Backspace => app.on_backspace(),
+                KeyCode::Enter => app.on_enter(),
+                KeyCode::Esc => app.on_escape(),
                 _ => {}
             },
             Event::Tick => {

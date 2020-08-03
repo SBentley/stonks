@@ -53,10 +53,40 @@ impl<'a> App<'a> {
     pub fn on_key(&mut self, c: char) {
         match c {
             'q' => {
-                self.should_quit = true;
+                if let InputMode::Normal = self.input_mode {
+                    self.should_quit = true;
+                } else {
+                    self.input.push('q');
+                }
+            },
+            '/' => {
+                match self.input_mode {
+                    InputMode::Normal => self.input_mode = InputMode::Editing,
+                    InputMode::Editing => self.input_mode = InputMode::Normal,
+                }
+            },
+            _ => {
+                if let InputMode::Editing = self.input_mode {
+                    self.input.push(c);
+                }
             }
-            _ => {}
         }
+    }
+
+    pub fn on_backspace(&mut self) {
+        if self.input.len() > 0 {
+            self.input.remove(self.input.len() - 1);
+        }
+    }
+
+    pub fn on_enter(&mut self) {
+        self.symbol = self.input.to_uppercase().clone();
+        self.company = None;
+        self.input.clear();
+    }
+
+    pub fn on_escape(&mut self) {
+        self.input_mode = InputMode::Normal;
     }
 
     pub fn on_tick(&mut self) {

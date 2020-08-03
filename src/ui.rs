@@ -27,18 +27,26 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<(String
         .split(f.size());
 
     let msg = match app.input_mode {
-        InputMode::Normal => "Search for an asset",
-        InputMode::Editing => "Press Esc to stop editing, Enter to record the message",
+        InputMode::Normal => "Press / to search for an asset",
+        InputMode::Editing => "Press Esc to stop editing, Enter to search",
     };
     let text = [Text::raw(msg)];
     let help_message = Paragraph::new(text.iter());
     f.render_widget(help_message, chunks[0]);
 
+    let border_stlye = match app.input_mode {
+        InputMode::Normal => Style::default().fg(Color::Rgb(230,126,34)), //carrot orange
+        InputMode::Editing => Style::default().fg(Color::LightGreen),
+    };
+
     let text = [Text::raw(&app.input)];
     let input = Paragraph::new(text.iter())
         .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().borders(Borders::ALL).title("Search"))
+        .block(Block::default().borders(Borders::ALL).title("Search")
+        .border_style(border_stlye)
+        .title_style(Style::default().fg(Color::Blue)))
         .style(Style::default().fg(Color::Red));
+
     f.render_widget(input, chunks[1]);
 
     match app.tabs.index {
@@ -104,6 +112,7 @@ where
             min = price_range.0;
             max = price_range.1;
         }
+
         let x_labels = [
             format!("{}", 0),
             format!("{}", data.len() / 10 * 1),
@@ -230,7 +239,7 @@ fn assemble_company_info<'a, 'b>(
 
 fn live_price_text(text: &mut Vec<Text>, company: &mut asset::Company, wsrx: &Receiver<(String, f64)>) {
     let d = Duration::from_millis(0);
-    let res = wsrx.recv();// recv_timeout(d);
+    let res = wsrx.recv_timeout(d);
     match res {
         Ok(msg) => {
             let (symbol, price) = msg;
