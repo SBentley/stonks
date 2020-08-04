@@ -2,3 +2,5 @@
 config.toml
 *.log
 ws.py
+.vscode/
+.idea/

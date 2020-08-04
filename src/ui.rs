@@ -18,8 +18,8 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<(String
     let chunks = Layout::default()
         .constraints(
             [
-                Constraint::Percentage(3),
-                Constraint::Percentage(7),
+                Constraint::Length(1),
+                Constraint::Length(3),
                 Constraint::Percentage(90),
             ]
             .as_ref(),
@@ -35,16 +35,20 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<(String
     f.render_widget(help_message, chunks[0]);
 
     let border_stlye = match app.input_mode {
-        InputMode::Normal => Style::default().fg(Color::Rgb(230,126,34)), //carrot orange
+        InputMode::Normal => Style::default().fg(Color::Rgb(230, 126, 34)), //carrot orange
         InputMode::Editing => Style::default().fg(Color::LightGreen),
     };
 
     let text = [Text::raw(&app.input)];
     let input = Paragraph::new(text.iter())
         .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().borders(Borders::ALL).title("Search")
-        .border_style(border_stlye)
-        .title_style(Style::default().fg(Color::Blue)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Search")
+                .border_style(border_stlye)
+                .title_style(Style::default().fg(Color::Blue)),
+        )
         .style(Style::default().fg(Color::Red));
 
     f.render_widget(input, chunks[1]);
@@ -127,19 +131,17 @@ where
             format!("{}", data.len()),
         ];
 
-        let datasets = [
-            Dataset::default()
-                .name("data2")
-                .marker(symbols::Marker::Braille)
-                .style(Style::default().fg(Color::Cyan))
-                .data(&data),
-        ];
+        let datasets = [Dataset::default()
+            .name("data2")
+            .marker(symbols::Marker::Braille)
+            .style(Style::default().fg(Color::Cyan))
+            .data(&data)];
         let min_string = format!("{}", min as u16);
         let mid_string = format!("{}", (max as u16 + min as u16) / 2);
-        let max_string = format!("{}", max as u16);        
-        let labels = [min_string,mid_string, max_string];
+        let max_string = format!("{}", max as u16);
+        let labels = [min_string, mid_string, max_string];
 
-        let chart = Chart::default()    
+        let chart = Chart::default()
             .block(
                 Block::default()
                     .title("Chart")
@@ -188,7 +190,7 @@ where
 }
 
 fn assemble_company_info<'a, 'b>(
-    company: &'a mut asset::Company,
+    company: &'a mut asset::CompanyInfo,
     text: &'b mut Vec<Text<'a>>,
     wsrx: &Receiver<(String, f64)>,
 ) {
@@ -234,10 +236,13 @@ fn assemble_company_info<'a, 'b>(
     text.push(Text::raw(format!("{}", company.industry)));
 
     live_price_text(text, company, wsrx);
-
 }
 
-fn live_price_text(text: &mut Vec<Text>, company: &mut asset::Company, wsrx: &Receiver<(String, f64)>) {
+fn live_price_text(
+    text: &mut Vec<Text>,
+    company: &mut asset::CompanyInfo,
+    wsrx: &Receiver<(String, f64)>,
+) {
     let d = Duration::from_millis(0);
     let res = wsrx.recv_timeout(d);
     match res {
@@ -247,7 +252,7 @@ fn live_price_text(text: &mut Vec<Text>, company: &mut asset::Company, wsrx: &Re
                 format!("\nLive - {} ", symbol),
                 Style::default().fg(Color::Blue),
             ));
-            if price > company.prices.live_price {                
+            if price > company.prices.live_price {
                 text.push(Text::styled(
                     format!("▲ {}", price),
                     Style::default().fg(Color::Green),
@@ -273,7 +278,10 @@ fn live_price_text(text: &mut Vec<Text>, company: &mut asset::Company, wsrx: &Re
             }
 
             text.push(Text::styled(
-                format!("{} {}", company.prices.movement_indicator, company.prices.live_price),
+                format!(
+                    "{} {}",
+                    company.prices.movement_indicator, company.prices.live_price
+                ),
                 Style::default().fg(color),
             ));
             //error!("{}", e);

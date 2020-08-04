@@ -1,4 +1,4 @@
-use crate::asset::Company;
+use crate::asset::CompanyInfo;
 use crate::util::TabsState;
 use std::collections::HashMap;
 
@@ -14,7 +14,7 @@ pub struct App<'a> {
     pub tabs: TabsState<'a>,
     pub input_mode: InputMode,
     pub input: String,
-    pub company: Option<Company>,
+    pub company: Option<CompanyInfo>,
     pub symbol: String,
     pub config: HashMap<String, String>,
 }
@@ -58,12 +58,10 @@ impl<'a> App<'a> {
                 } else {
                     self.input.push('q');
                 }
-            },
-            '/' => {
-                match self.input_mode {
-                    InputMode::Normal => self.input_mode = InputMode::Editing,
-                    InputMode::Editing => self.input_mode = InputMode::Normal,
-                }
+            }
+            '/' => match self.input_mode {
+                InputMode::Normal => self.input_mode = InputMode::Editing,
+                InputMode::Editing => self.input_mode = InputMode::Normal,
             },
             _ => {
                 if let InputMode::Editing = self.input_mode {

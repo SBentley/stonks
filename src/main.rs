@@ -1,5 +1,15 @@
+use app::App;
+use config;
+use crossterm::{
+    event::{self, DisableMouseCapture, Event as CEvent, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
+};
+use io::Stdout;
 #[allow(unused_imports)]
 use log::{debug, error, info, trace, warn};
+use mpsc::Receiver;
+use reqwest::Url;
 use std::io;
 use std::{
     collections::HashMap,
@@ -10,14 +20,6 @@ use std::{
 };
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
-
-use config;
-use crossterm::{
-    event::{self, DisableMouseCapture, Event as CEvent, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
-};
-use reqwest::Url;
 mod app;
 mod asset;
 mod ui;
@@ -43,6 +45,53 @@ fn main() -> Result<(), io::Error> {
     terminal.show_cursor().expect("Could not show cursor");
     enable_raw_mode().unwrap();
 
+    let mut app = App::new("Stonks", String::from("TSLA"), config);
+
+    // Live prices websocket
+    let (wstx, wsrx) = mpsc::channel();
+    let api_key = app
+        .config
+        .get("api_key")
+        .expect("Could not get api_key")
+        .to_string();
+    let symbol = app.symbol.to_string();
+    asset::get_all_securites(&api_key).unwrap();
+
+    // Spawn websocket thread
+    thread::spawn(move || {
+        let (mut socket, response) = tungstenite::connect(
+            Url::parse(&format!("wss://ws.finnhub.io?token={}", api_key)).unwrap(),
+        )
+        .expect("cannot connect to websocket");
+
+        // A WebSocket echo server
+        let message_text = format!(
+            "{{\"type\":\"subscribe\",\"symbol\":\"{}\"}}",
+            //"BINANCE:BTCUSDT"
+            symbol
+        );
+        let subscribe_msg = tungstenite::Message::Text(String::from(message_text));
+        socket.write_message(subscribe_msg).unwrap();
+        for (ref header, _value) in response.headers() {
+            info!("ws headers: {}", header);
+        }
+
+        asset::live_price(socket, wstx);
+    });
+    terminal.clear()?;
+    terminal.hide_cursor().unwrap();
+
+    setup_input_handler(&mut app, &mut terminal, wsrx).unwrap();
+
+    terminal.clear()?;
+    Ok(())
+}
+
+fn setup_input_handler(
+    mut app: &mut App,
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    wsrx: Receiver<(String, f64)>,
+) -> Result<(), io::Error> {
     // Setup input handling
     let (tx, rx) = mpsc::channel();
 
@@ -63,39 +112,6 @@ fn main() -> Result<(), io::Error> {
         }
     });
 
-    let mut app = app::App::new("Stonks", String::from("TSLA"), config);
-
-    // Live prices websocket
-    let (wstx, wsrx) = mpsc::channel();
-    let api_key = app
-        .config
-        .get("api_key")
-        .expect("Could not get api_key")
-        .to_string();
-    let symbol = app.symbol.to_string();
-    thread::spawn(move || {
-        let (mut socket, response) = tungstenite::connect(
-            Url::parse(&format!("wss://ws.finnhub.io?token={}", api_key)).unwrap(),
-        )
-        .expect("cannot connect to websocket");
-
-        // A WebSocket echo server
-        let message_text = format!(
-            "{{\"type\":\"subscribe\",\"symbol\":\"{}\"}}",
-            //"BINANCE:BTCUSDT" 
-            symbol
-        );
-        let subscribe_msg = tungstenite::Message::Text(String::from(message_text));
-        socket.write_message(subscribe_msg).unwrap();
-        for (ref header, _value) in response.headers() {
-            info!("ws headers: {}", header);
-        }
-
-        asset::live_price(socket, wstx);
-    });
-
-    terminal.clear()?;
-    terminal.hide_cursor().unwrap();
     loop {
         terminal.draw(|mut f| ui::draw(&mut f, &mut app, &wsrx))?;
         match rx.recv().unwrap() {
@@ -129,7 +145,6 @@ fn main() -> Result<(), io::Error> {
             break;
         }
     }
-    terminal.clear()?;
     Ok(())
 }
 

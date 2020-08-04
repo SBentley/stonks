@@ -9,7 +9,7 @@ use mpsc::Sender;
 use native_tls::TlsStream;
 
 #[derive(Deserialize, Debug)]
-pub struct Company {
+pub struct CompanyInfo {
     pub name: String,
     pub ticker: String,
     pub country: String,
@@ -22,6 +22,7 @@ pub struct Company {
     #[serde(skip)]
     pub prices: Prices,
 }
+/// Financial data from the websocket message
 #[derive(Deserialize, Debug)]
 pub struct LiveData {
     #[serde(rename(deserialize = "p"))]
@@ -34,13 +35,16 @@ pub struct LiveData {
     pub volume: f32,
 }
 
+/// Websocket raw message data
 #[derive(Deserialize, Debug)]
 pub struct Feed {
     pub data: Option<Vec<LiveData>>,
+    /// Can be type or ping
     #[serde(rename(deserialize = "type"))]
     pub message_type: String,
 }
 
+/// Data from candles endpoint: api/v1/stock/candle
 #[derive(Deserialize, Debug, Default)]
 pub struct Prices {
     #[serde(rename(deserialize = "c"))]
@@ -50,9 +54,19 @@ pub struct Prices {
     #[serde(skip)]
     pub movement_indicator: String,
 }
+#[derive(Deserialize, Debug, Default)]
+pub struct Stock {
+    pub currency: String,
+    pub description: String,
+    #[serde(rename(deserialize = "displaySymbol"))]
+    pub display_symbol: String,
+    pub symbol: String,
+    #[serde(rename(deserialize = "type"))]
+    pub security_type: String,
+}
 
-pub fn get_error_company() -> Company {
-    Company {
+pub fn get_error_company() -> CompanyInfo {
+    CompanyInfo {
         name: String::from("Error getting comapny info"),
         ticker: String::from("PLC"),
         country: String::from("UK"),
@@ -72,7 +86,7 @@ pub fn get_error_company() -> Company {
 pub async fn get_equity(
     api_key: &str,
     symbol: &str,
-) -> Result<Company, Box<dyn std::error::Error>> {
+) -> Result<CompanyInfo, Box<dyn std::error::Error>> {
     let url = format!("https://finnhub.io/api/v1/stock/profile2?symbol={}", symbol);
     let client = reqwest::Client::new();
     let resp = client
@@ -83,7 +97,7 @@ pub async fn get_equity(
     info!("{}", resp.status());
 
     if resp.status().is_success() {
-        let mut company: Company = resp.json().await?;
+        let mut company: CompanyInfo = resp.json().await?;
         company.market_capitalization *= 1000000.0;
         info!("{:#?}", company);
         Ok(company)
@@ -91,6 +105,28 @@ pub async fn get_equity(
         // TODO: fix error handling here, do not return ok if not ok
         Ok(get_error_company())
     }
+}
+
+#[tokio::main]
+pub async fn get_all_securites(api_key: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let url = "https://finnhub.io/api/v1/stock/symbol?exchange=US";
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(url)
+        .header("X-Finnhub-Token", api_key)
+        .send()
+        .await?;
+
+    if resp.status().is_success() {
+        info!("All securities success");
+        let securities: Vec<Stock> = resp.json().await?;
+        info!("Prices: {:#?}", securities);
+    } else {
+        // TODO: fix error handling here, do not return ok if not ok
+        panic!("Cannot get list of securities")
+    }
+
+    Ok(())
 }
 
 #[tokio::main]
