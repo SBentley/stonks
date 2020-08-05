@@ -72,9 +72,7 @@ impl<'a> App<'a> {
     }
 
     pub fn on_backspace(&mut self) {
-        if self.input.len() > 0 {
-            self.input.remove(self.input.len() - 1);
-        }
+        self.input.pop();
     }
 
     pub fn on_enter(&mut self) {
