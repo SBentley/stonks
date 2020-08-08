@@ -1157,6 +1157,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "simsearch"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b66fcd1baa14911b851a0eb32e94d788f5f1fe8c065ac6059b693af490777309"
+dependencies = [
+ "strsim",
+ "triple_accel",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1200,12 +1210,19 @@ dependencies = [
  "reqwest",
  "serde 1.0.114",
  "serde_json",
+ "simsearch",
  "tokio",
  "tui",
  "tungstenite",
  "unicode-width",
  "url",
 ]
+
+[[package]]
+name = "strsim"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "syn"
@@ -1350,6 +1367,12 @@ checksum = "94ae75f0d28ae10786f3b1895c55fe72e79928fd5ccdebb5438c75e93fec178f"
 dependencies = [
  "lazy_static",
 ]
+
+[[package]]
+name = "triple_accel"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cef429eb300c9dbe7f9bb1b7dde13547ed2ba8f9fe07ff1db885c2d760cef4f"
 
 [[package]]
 name = "try-lock"

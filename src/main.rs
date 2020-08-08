@@ -22,6 +22,7 @@ use tui::backend::CrosstermBackend;
 use tui::Terminal;
 mod app;
 mod asset;
+mod search_page;
 mod ui;
 mod util;
 
@@ -55,7 +56,8 @@ fn main() -> Result<(), io::Error> {
         .expect("Could not get api_key")
         .to_string();
     let symbol = app.symbol.to_string();
-    asset::get_all_securites(&api_key).unwrap();
+    app.securities = asset::get_all_securites(&api_key).unwrap();
+    app.search_engine = Some(search_page::SearchEngine::new(&mut app.securities));
 
     // Spawn websocket thread
     thread::spawn(move || {

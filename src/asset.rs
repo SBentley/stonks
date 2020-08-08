@@ -2,7 +2,7 @@ use chrono::{offset::Utc, DateTime, Duration};
 #[allow(unused_imports)]
 use log::{debug, error, info, trace, warn};
 use serde::Deserialize;
-use std::{net::TcpStream, sync::mpsc, time::SystemTime};
+use std::{error::Error, net::TcpStream, sync::mpsc, time::SystemTime};
 use tungstenite::{stream::Stream, Message, WebSocket};
 //use serde_json::{Result};
 use mpsc::Sender;
@@ -54,7 +54,7 @@ pub struct Prices {
     #[serde(skip)]
     pub movement_indicator: String,
 }
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct Stock {
     pub currency: String,
     pub description: String,
@@ -63,6 +63,12 @@ pub struct Stock {
     pub symbol: String,
     #[serde(rename(deserialize = "type"))]
     pub security_type: String,
+}
+
+impl PartialEq for Stock {
+    fn eq(&self, other: &Self) -> bool {
+        self.symbol == other.symbol
+    }
 }
 
 pub fn get_error_company() -> CompanyInfo {
@@ -83,10 +89,7 @@ pub fn get_error_company() -> CompanyInfo {
 }
 
 #[tokio::main]
-pub async fn get_equity(
-    api_key: &str,
-    symbol: &str,
-) -> Result<CompanyInfo, Box<dyn std::error::Error>> {
+pub async fn get_equity(api_key: &str, symbol: &str) -> Result<CompanyInfo, Box<dyn Error>> {
     let url = format!("https://finnhub.io/api/v1/stock/profile2?symbol={}", symbol);
     let client = reqwest::Client::new();
     let resp = client
@@ -102,13 +105,12 @@ pub async fn get_equity(
         info!("{:#?}", company);
         Ok(company)
     } else {
-        // TODO: fix error handling here, do not return ok if not ok
-        Ok(get_error_company())
+        Err("Error getting company info...".into())
     }
 }
 
 #[tokio::main]
-pub async fn get_all_securites(api_key: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn get_all_securites(api_key: &str) -> Result<Vec<Stock>, Box<dyn std::error::Error>> {
     let url = "https://finnhub.io/api/v1/stock/symbol?exchange=US";
     let client = reqwest::Client::new();
     let resp = client
@@ -118,15 +120,13 @@ pub async fn get_all_securites(api_key: &str) -> Result<(), Box<dyn std::error::
         .await?;
 
     if resp.status().is_success() {
-        info!("All securities success");
         let securities: Vec<Stock> = resp.json().await?;
         info!("Prices: {:#?}", securities);
+        Ok(securities)
     } else {
-        // TODO: fix error handling here, do not return ok if not ok
+        // TODO: fix error handling here
         panic!("Cannot get list of securities")
     }
-
-    Ok(())
 }
 
 #[tokio::main]

@@ -1,5 +1,7 @@
-use crate::asset::CompanyInfo;
+use crate::asset::{CompanyInfo, Stock};
+use crate::search_page::SearchEngine;
 use crate::util::TabsState;
+use simsearch::SimSearch;
 use std::collections::HashMap;
 
 pub enum InputMode {
@@ -7,6 +9,10 @@ pub enum InputMode {
     Editing,
 }
 
+pub enum State {
+    Search,
+    Normal,
+}
 pub struct App<'a> {
     pub title: &'a str,
     pub show_chart: bool,
@@ -17,6 +23,9 @@ pub struct App<'a> {
     pub company: Option<CompanyInfo>,
     pub symbol: String,
     pub config: HashMap<String, String>,
+    pub state: State,
+    pub securities: Vec<Stock>,
+    pub search_engine: Option<SearchEngine>,
 }
 
 impl<'a> App<'a> {
@@ -31,16 +40,15 @@ impl<'a> App<'a> {
             company: None,
             symbol,
             config,
+            state: State::Normal,
+            securities: Vec::new(),
+            search_engine: None,
         }
     }
 
-    pub fn on_up(&mut self) {
-        //self.tasks.previous();
-    }
+    pub fn on_up(&mut self) {}
 
-    pub fn on_down(&mut self) {
-        //self.tasks.next();
-    }
+    pub fn on_down(&mut self) {}
 
     pub fn on_right(&mut self) {
         self.tabs.next();
@@ -56,7 +64,7 @@ impl<'a> App<'a> {
                 if let InputMode::Normal = self.input_mode {
                     self.should_quit = true;
                 } else {
-                    self.input.push('q');
+                    self.search_text_input(c);
                 }
             }
             '/' => match self.input_mode {
@@ -65,10 +73,14 @@ impl<'a> App<'a> {
             },
             _ => {
                 if let InputMode::Editing = self.input_mode {
-                    self.input.push(c);
+                    self.search_text_input(c);
                 }
             }
         }
+    }
+
+    fn search_text_input(&mut self, c: char) {
+        self.input.push(c);
     }
 
     pub fn on_backspace(&mut self) {
@@ -76,9 +88,10 @@ impl<'a> App<'a> {
     }
 
     pub fn on_enter(&mut self) {
-        self.symbol = self.input.to_uppercase().clone();
+        self.state = State::Search;
+        //self.symbol = self.input.to_uppercase().clone();
         self.company = None;
-        self.input.clear();
+        //self.input.clear();
     }
 
     pub fn on_escape(&mut self) {

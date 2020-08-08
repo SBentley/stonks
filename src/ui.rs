@@ -1,4 +1,6 @@
+use crate::app::State;
 use crate::app::{App, InputMode};
+use crate::search_page::{SearchEngine};
 use crate::asset;
 #[allow(unused_imports)]
 use log::{debug, error, info, trace, warn};
@@ -15,11 +17,18 @@ use tui::{
 };
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<(String, f64)>) {
+    let search_box_size: u16;
+    match app.state {
+        State::Search => search_box_size = 7,
+        State::Normal => search_box_size = 0,
+    }
+
     let chunks = Layout::default()
         .constraints(
             [
                 Constraint::Length(1),
                 Constraint::Length(3),
+                Constraint::Length(search_box_size),
                 Constraint::Percentage(90),
             ]
             .as_ref(),
@@ -39,6 +48,21 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<(String
         InputMode::Editing => Style::default().fg(Color::LightGreen),
     };
 
+    let mut text: Vec<tui::widgets::Text> = Vec::new();
+    if let Some(search_engine) = &app.search_engine {
+        if !app.input.is_empty() {
+            let mut names = search_engine.engine.search(&app.input);
+            let mut short_names: Vec<asset::Stock> = Vec::new();
+            short_names.append(&mut names[0..5].to_vec());
+            for suggestion in short_names{
+                text.append(&mut [Text::raw(format!("\n{}",suggestion.description))].to_vec())
+            }
+        }
+    }
+    let search_suggestion = Paragraph::new(text.iter());
+    
+    f.render_widget(search_suggestion, chunks[2]);
+
     let text = [Text::raw(&app.input)];
     let input = Paragraph::new(text.iter())
         .style(Style::default().fg(Color::Yellow))
@@ -54,7 +78,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App, wsrx: &Receiver<(String
     f.render_widget(input, chunks[1]);
 
     match app.tabs.index {
-        0 => draw_first_tab(f, app, chunks[2], &wsrx),
+        0 => draw_first_tab(f, app, chunks[3], &wsrx),
         _ => {}
     };
 }
@@ -90,7 +114,7 @@ where
             None => {
                 let api_key = app.config.get("api_key").expect("No API Key in config");
                 match asset::get_equity(api_key, &app.symbol) {
-                    Err(err) => println!("Error getting {}", err),
+                    Err(err) => error!("Error getting {}", err),
                     Ok(mut company) => {
                         match asset::get_price_history(api_key, &app.symbol, "D") {
                             Ok(res) => company.prices = res,
@@ -103,9 +127,6 @@ where
             Some(_) => {}
         }
         let mut data = Vec::<(f64, f64)>::new();
-        data.push((1.0, 217.68));
-        data.push((2.0, 222.49));
-        data.push((3.0, 217.19));
 
         let mut min = 0.0;
         let mut max = 300.0;
@@ -267,7 +288,7 @@ fn live_price_text(
             }
             company.prices.live_price = price;
         }
-        Err(e) => {
+        Err(_e) => {
             text.push(Text::styled(
                 format!("\nLive - {} ", company.ticker),
                 Style::default().fg(Color::Blue),
